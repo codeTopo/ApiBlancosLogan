@@ -1,0 +1,6 @@
+@ApiBlancosLogan_HostAddress = http://localhost:5167
+
+GET {{ApiBlancosLogan_HostAddress}}/api/Clientes
+Accept: application/json
+
+###
