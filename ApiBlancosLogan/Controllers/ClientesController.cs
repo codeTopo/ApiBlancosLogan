@@ -15,11 +15,10 @@ namespace ApiBlancosLogan.Controllers
         {
             context = _context;
         }
-
         //Solicitudes Http
         //Get General
         [HttpGet]
-        [Authorize(Roles ="Master, admin")]
+        [Authorize(Roles ="Master, Admin")]
         public async Task<IActionResult> Get()
         {
             Respuestas respuestas = new()
@@ -44,7 +43,7 @@ namespace ApiBlancosLogan.Controllers
         }
         //Get por Telefono
         [HttpGet("{telefono}")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult> GetByTelefono(string telefono)
         {
             Respuestas respuestas = new()
@@ -110,7 +109,7 @@ namespace ApiBlancosLogan.Controllers
             return Ok(respuestas);
         }
         [HttpPost("agregar")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult>Post(ClienteRequest model)
         {
             var respuestas = new Respuestas
@@ -134,32 +133,43 @@ namespace ApiBlancosLogan.Controllers
 
                 return BadRequest(respuestas);
             }
-            await using var transaction = await context.Database.BeginTransactionAsync();
+            var strategy = context.Database.CreateExecutionStrategy();
             try
             {
-                var cliente = new Cliente
+                await strategy.ExecuteAsync(async () =>
                 {
-                    Nombre = model.Nombre!,
-                    Apellidos = model.Apellidos!,
-                    Telefono = model.Telefono!
-                };
-                context.Clientes.Add(cliente);
-                await context.SaveChangesAsync();
-                await transaction.CommitAsync();
-                respuestas.Exito = 1;
-                respuestas.Mensaje = "Cliente Agregado Correctamente";
-                respuestas.Data = cliente;
+                    await using var transaction = await context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var cliente = new Cliente
+                        {
+                            Nombre = model.Nombre!,
+                            Apellidos = model.Apellidos!,
+                            Telefono = model.Telefono!
+                        };
+                        context.Clientes.Add(cliente);
+                        await context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                        respuestas.Exito = 1;
+                        respuestas.Mensaje = "Cliente Agregado Correctamente";
+                        respuestas.Data = cliente;
 
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
-            catch (Exception ex )
+            catch (Exception ex)
             {
-                await transaction.RollbackAsync();
                 respuestas.Mensaje = $"Error al intentar agregar el producto. {ex.Message}";
-            }
+            }  
             return Ok(respuestas);
         }
         [HttpPut("{id}")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult>Put(long id, [FromBody] ClienteUpdate model)
         {
             var respuestas = new Respuestas
@@ -183,7 +193,6 @@ namespace ApiBlancosLogan.Controllers
 
                 return BadRequest(respuestas);
             }
-            await using var transaction = await context.Database.BeginTransactionAsync();
             try
             {
                 Cliente nCliente = context.Clientes.Find(id)!;
@@ -197,20 +206,18 @@ namespace ApiBlancosLogan.Controllers
                 nCliente.Telefono = model.Telefono ?? nCliente.Telefono;
                 context.Entry(nCliente).State = EntityState.Modified;
                 await context.SaveChangesAsync();
-                await transaction.CommitAsync();
                 respuestas.Exito = 1;
                 respuestas.Mensaje = "Cliente Actualizado con Exito";
                 respuestas.Data = nCliente;
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
                 respuestas.Mensaje = $"Error al intentar agregar el producto. {ex.Message}";
             }
             return Ok(respuestas);
         }
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Master, admin")]
+        [Authorize(Roles = "Master, Admin")]
         public async Task<IActionResult> Delete(long id)
         {
             var respuestas = new Respuestas

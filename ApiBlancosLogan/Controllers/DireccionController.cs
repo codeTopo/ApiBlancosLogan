@@ -12,7 +12,7 @@ namespace ApiBlancosLogan.Controllers
     public class DireccionController(BlancosLoganContext context) : ControllerBase
     {
         [HttpGet]
-        [Authorize(Roles = "Master, admin")]
+        [Authorize(Roles = "Master, Admin")]
         public async Task<IActionResult> Get()
         {
             Respuestas respuestas = new()
@@ -34,7 +34,7 @@ namespace ApiBlancosLogan.Controllers
             return Ok(respuestas);
         }
         [HttpGet("{telefono}")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult> GetByTelefono(string telefono)
         {
             Respuestas respuestas = new()
@@ -81,9 +81,8 @@ namespace ApiBlancosLogan.Controllers
             }
             return Ok(respuestas);
         }
-
         [HttpGet("idDireccion/{iddireccion}")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult> GetId(long idDireccion)
         {
             Respuestas respuestas = new()
@@ -116,9 +115,8 @@ namespace ApiBlancosLogan.Controllers
             }
             return Ok(respuestas);
         }
-
         [HttpPost("agregar")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult>Post(DirecionRequest model)
         {
             Respuestas respuestas = new()
@@ -141,35 +139,46 @@ namespace ApiBlancosLogan.Controllers
                 respuestas.Data = errores;
                 return BadRequest(respuestas);
             }
-            await using var transaction = await context.Database.BeginTransactionAsync();
+            var strategy = context.Database.CreateExecutionStrategy();
             try
             {
-                var direccion = new Direccion
+                await strategy.ExecuteAsync(async () =>
                 {
-                    CodigoPostal = model.Cp!,
-                    Estado = model.Estado,
-                    Municipio = model.Municipio,
-                    Calle = model.Calle,
-                    Colonia = model.Colonia,
-                    Numero = model.Numero!,
-                    Telefono=model.Telefono!,
-                };
-                context.Direccions.Add(direccion);
-                await context.SaveChangesAsync();
-                await transaction.CommitAsync();
-                respuestas.Exito = 1;
-                respuestas.Mensaje = "Direccion Agregado Correctamente";
-                respuestas.Data = direccion;
+                    await using var transaction = await context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var direccion = new Direccion
+                        {
+                            CodigoPostal = model.Cp!,
+                            Estado = model.Estado,
+                            Municipio = model.Municipio,
+                            Calle = model.Calle,
+                            Colonia = model.Colonia,
+                            Numero = model.Numero!,
+                            Telefono = model.Telefono!,
+                        };
+                        context.Direccions.Add(direccion);
+                        await context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                        respuestas.Exito = 1;
+                        respuestas.Mensaje = "Direccion Agregado Correctamente";
+                        respuestas.Data = direccion;
+
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                    }
+                });
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
                 respuestas.Mensaje = $"Error al intentar agregar el producto. {ex.Message}";
             }
             return Ok(respuestas);
         }
         [HttpPut("{id}")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult> Put(long id, [FromBody] DirecionRequest model)
         {
             var respuestas = new Respuestas
@@ -207,10 +216,8 @@ namespace ApiBlancosLogan.Controllers
                 direccion.Municipio = model.Municipio ?? direccion.Municipio;
                 direccion.Calle = model.Calle ?? direccion.Calle;
                 direccion.Numero = model.Numero ?? direccion.Numero;
-
                 context.Entry(direccion).State = EntityState.Modified;
                 await context.SaveChangesAsync();
-
                 respuestas.Exito = 1;
                 respuestas.Mensaje = "Dirección Actualizada con Éxito";
                 respuestas.Data = direccion;
@@ -221,9 +228,8 @@ namespace ApiBlancosLogan.Controllers
             }
             return Ok(respuestas);
         }
-
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Master, admin")]
+        [Authorize(Roles = "Master")]
         public async Task<IActionResult>Delete(long id)
         {
             var respuestas = new Respuestas

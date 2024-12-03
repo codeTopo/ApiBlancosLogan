@@ -6,20 +6,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ApiBlancosLogan.Controllers
 {
+
     [Route("api/[controller]")]
     [ApiController]
-    public class TerminosController : ControllerBase
+    public class CarruselController : ControllerBase
     {
         private readonly BlancosLoganContext context;
-        public TerminosController(BlancosLoganContext _context)
+        public CarruselController(BlancosLoganContext _context)
         {
             context = _context;
-
         }
-
-
+        //Solicitudes Http
+        //Get General
         [HttpGet]
-        [Authorize(Roles = "Master, Admin")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult> Get()
         {
             Respuestas respuestas = new()
@@ -29,9 +29,9 @@ namespace ApiBlancosLogan.Controllers
             };
             try
             {
-                var cliente = await context.Terminos.ToListAsync();
+                var cliente = await context.Carrusels.ToListAsync();
                 respuestas.Exito = 1;
-                respuestas.Mensaje = "lista De Clientes";
+                respuestas.Mensaje = "lista De Fotos";
                 respuestas.Data = cliente;
             }
             catch (Exception ex)
@@ -42,10 +42,10 @@ namespace ApiBlancosLogan.Controllers
             }
             return Ok(respuestas);
         }
-
+       
         [HttpPost("agregar")]
-        [Authorize(Roles = "Master, Admin, Usuario")]
-        public async Task<IActionResult> Post(TerminosRequest model)
+        [Authorize(Roles = "Master, Admin")]
+        public async Task<IActionResult> Post(CarruselRequest model)
         {
             var respuestas = new Respuestas
             {
@@ -68,13 +68,6 @@ namespace ApiBlancosLogan.Controllers
 
                 return BadRequest(respuestas);
             }
-            var cliente = await context.Clientes.FindAsync(model.IdCliente);
-            if (cliente == null)
-            {
-                respuestas.Exito = 0;
-                respuestas.Mensaje = "El IdCliente proporcionado no es válido.";
-                return BadRequest(respuestas);
-            }
             var strategy = context.Database.CreateExecutionStrategy();
             try
             {
@@ -83,18 +76,19 @@ namespace ApiBlancosLogan.Controllers
                     await using var transaction = await context.Database.BeginTransactionAsync();
                     try
                     {
-                        var terminos = new Termino
+                        var carrusel
+                        = new Carrusel
                         {
-                            IdCliente = model.IdCliente,
-                            Fecha = DateTime.Now,
-                            ArchivoVersion = model.ArchivoVersion,
+                            Nombre = model.Nombre!,
+                            Imagen = model.Imagen!,
                         };
-                        await context.AddAsync(terminos);
+                        context.Carrusels.Add(carrusel);
                         await context.SaveChangesAsync();
                         await transaction.CommitAsync();
                         respuestas.Exito = 1;
-                        respuestas.Mensaje = $"Términos aceptados con la fecha {terminos.Fecha}";
-                        respuestas.Data = terminos;
+                        respuestas.Mensaje = "Foto Agregado Correctamente";
+                        respuestas.Data = carrusel;
+
                     }
                     catch (Exception)
                     {
@@ -106,10 +100,37 @@ namespace ApiBlancosLogan.Controllers
             catch (Exception ex)
             {
                 respuestas.Mensaje = $"Error al intentar agregar el producto. {ex.Message}";
-                return StatusCode(500, respuestas);
             }
             return Ok(respuestas);
         }
-
+       
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Master, Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var respuestas = new Respuestas
+            {
+                Exito = 0,
+                Mensaje = "Error al Conectar a la Base de Datos"
+            };
+            try
+            {
+                var cliente = await context.Carrusels.FindAsync(id);
+                if (cliente == null)
+                {
+                    respuestas.Mensaje = "Foto no encontrado";
+                    return NotFound(respuestas);
+                }
+                context.Remove(cliente);
+                await context.SaveChangesAsync();
+                respuestas.Exito = 1;
+                respuestas.Mensaje = "Foto Eliminado Correctamente";
+            }
+            catch (Exception ex)
+            {
+                respuestas.Mensaje = ex.Message;
+            }
+            return Ok(respuestas);
+        }
     }
 }

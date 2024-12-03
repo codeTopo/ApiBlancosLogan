@@ -1,5 +1,5 @@
 using ApiBlancosLogan.Models;
-using BlancosLoganApi.Tools;
+using ApiBlancosLogan.Tools;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -8,8 +8,8 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllers();
+//todo esto es el jwt
 builder.Configuration.AddJsonFile("appsettings.json");
 var secretkey = builder.Configuration.GetValue<string>("settings:secretkey");
 if (string.IsNullOrEmpty(secretkey))
@@ -18,6 +18,7 @@ if (string.IsNullOrEmpty(secretkey))
     throw new InvalidOperationException("La clave 'settings:secretkey' no está configurada correctamente.");
 }
 var keyBytes = Encoding.UTF8.GetBytes(secretkey);
+
 builder.Services.AddSingleton<JwtService>(_ => new JwtService(secretkey));
 builder.Services.AddAuthentication(config =>
 {
@@ -36,6 +37,7 @@ builder.Services.AddAuthentication(config =>
     };
 });
 builder.Services.AddControllers();
+//esto es para la coneccion a la base de datos 
 builder.Services.AddDbContext<BlancosLoganContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"), sqlServerOptions =>
     {
@@ -46,16 +48,17 @@ builder.Services.AddDbContext<BlancosLoganContext>(options =>
         );
     })
 );
+//esto es para el cors quienes entran
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost4200", builder =>
     {
-        builder.WithOrigins("http://localhost:4200")
+        builder.WithOrigins("http://localhost:4200", "http://localhost:3000")
                .AllowAnyHeader()
                .AllowAnyMethod();
     });
 });
-
+builder.Services.AddScoped<MercadoPagoService>();
 var app = builder.Build();
 // Configure the HTTP request pipeline.
 app.UseHttpsRedirection();

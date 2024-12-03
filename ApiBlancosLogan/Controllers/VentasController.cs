@@ -16,17 +16,6 @@ namespace BlancosLoganApi.Controllers
         {
             _context = context;
         }
-
-       /* private async Task<decimal> ObtenerPrecioProducto(long idProducto)
-        {
-            var producto = await _context.Productos.FirstOrDefaultAsync(p => p.IdProducto == idProducto);
-            if (producto == null)
-            {
-                throw new Exception($"Producto con Id {idProducto} no encontrado.");
-            }
-            return producto.Precio ?? 0;
-        }*/
-
         private decimal ObtenerPrecioProducto(BlancosLoganContext context, long idProducto)
         {
             // Lógica para obtener el precio del producto de la base de datos
@@ -35,7 +24,7 @@ namespace BlancosLoganApi.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "Master, admin")]
+        [Authorize(Roles = "Master, Admin")]
         public async Task<IActionResult> Get()
         {
             var respuesta = new Respuestas { Exito = 0, Mensaje = "Error en la conexión a la base de datos" };
@@ -43,7 +32,7 @@ namespace BlancosLoganApi.Controllers
             {
                 var venta = await _context.Venta.ToListAsync();
                 respuesta.Exito = 1;
-                respuesta.Mensaje = "lista De Clientes";
+                respuesta.Mensaje = "lista De ventas";
                 respuesta.Data = venta;
             }
             catch (Exception ex)
@@ -54,7 +43,7 @@ namespace BlancosLoganApi.Controllers
 
         }
         [HttpGet("{id}")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin, Usuario")]
         public async Task<IActionResult>GetId(long id)
         {
             var respuestas = new Respuestas { Exito = 0, Mensaje = "Error en la conexión a la base de datos" };
@@ -108,7 +97,7 @@ namespace BlancosLoganApi.Controllers
             return Ok(respuestas);
         }
         [HttpPost("agregar")]
-        [Authorize(Roles = "Master, admin, Usuario")]
+        [Authorize(Roles = "Master, Admin")]
         public async Task<IActionResult> Add(VentaRequesPost model)
         {
             var respuesta = new Respuestas { Exito = 0, Mensaje = "Error en la conexión a la base de datos" };
@@ -140,54 +129,155 @@ namespace BlancosLoganApi.Controllers
                 respuesta.Mensaje = "El IdDireccion proporcionado no es válido.";
                 return BadRequest(respuesta);
             }
-            await using var transaction = await _context.Database.BeginTransactionAsync(); // Inicia la transacción
+            var strategy = _context.Database.CreateExecutionStrategy();
             try
             {
-                using (BlancosLoganContext context = new BlancosLoganContext())
+                await strategy.ExecuteAsync(async () =>
                 {
-                    // Crear la venta
-                    var ven = new Ventum
+                    await using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
                     {
-                        IdCliente = (long)model.IdCliente!,
-                        IdDirecion=(long)model.IdDireccion!,
-                        Fecha=DateTime.Now,
-                        Total = (long)model.Pedido!.Sum(concepto => concepto.Cantidad * ObtenerPrecioProducto(context, (long)concepto.IdProducto!))!
-                    };
-                    context.Venta.Add(ven);
-                    await context.SaveChangesAsync();
-                    // Agregar los conceptos
-                    foreach (var conceptos in model.Pedido!)
-                    {
-                        var concp = new Concepto
+                        using (BlancosLoganContext context = new BlancosLoganContext())
                         {
-                            IdProducto = (long)conceptos.IdProducto!,
-                            Cantidad = (int)conceptos.Cantidad!,
-                            Precio = ObtenerPrecioProducto(context, (long)conceptos.IdProducto!),
-                            IdVenta = ven.IdVenta
-                        };
-                        context.Conceptos.Add(concp);
+                            // Crear la venta
+                            var ven = new Ventum
+                            {
+                                IdCliente = (long)model.IdCliente!,
+                                IdDirecion = (long)model.IdDireccion!,
+                                Pago = model.Pago!,
+                                Fecha = DateTime.Now,
+                                Total = (long)model.Pedido!.Sum(concepto => concepto.Cantidad * ObtenerPrecioProducto(context, (long)concepto.IdProducto!))!
+                            };
+                            context.Venta.Add(ven);
+                            await context.SaveChangesAsync();
+                            // Agregar los conceptos
+                            foreach (var conceptos in model.Pedido!)
+                            {
+                                var concp = new Concepto
+                                {
+                                    IdProducto = (long)conceptos.IdProducto!,
+                                    Cantidad = (int)conceptos.Cantidad!,
+                                    Precio = ObtenerPrecioProducto(context, (long)conceptos.IdProducto!),
+                                    IdVenta = ven.IdVenta
+                                };
+                                context.Conceptos.Add(concp);
+                            }
+                            await context.SaveChangesAsync();
+                            await transaction.CommitAsync();
+                            var data = new
+                            {
+                                Venta = ven,
+                                Concepto = model.Pedido
+                            };
+                            respuesta.Data = data;
+                            respuesta.Exito = 1;
+                            respuesta.Mensaje = "Venta agregada con éxito";
+                        }
                     }
-                    await context.SaveChangesAsync(); // Guardar los conceptos
-                    // Confirmar la transacción
-                    await transaction.CommitAsync();
-                    var data = new
+                    catch (Exception)
                     {
-                        Venta = ven,
-                        Concepto = model.Pedido
-                    };
-                    respuesta.Data = data;
-                    respuesta.Exito = 1;
-                    respuesta.Mensaje = "Venta agregada con éxito";
-                }
+                        await transaction.RollbackAsync();
+                        throw;
+                    }                 
+                });             
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync(); // Rollback de la transacción en caso de error
                 respuesta.Mensaje = $"Error al intentar agregar la venta. {ex.Message}";
                 return StatusCode(500, respuesta); // Retornar un error 500 en caso de excepción
             }
             return Ok(respuesta);
         }
 
+        [HttpPost("addprepago/{idPrePago}")]
+        [Authorize(Roles = "Master, Admin")]
+        public async Task<IActionResult> AddDesdePrepago(Guid idPrePago)
+        {
+            var respuesta = new Respuestas { Exito = 0, Mensaje = "Error en la conexión a la base de datos" };
+            // Obtener el PrePago usando el idPrePago
+            var prePago = await _context.PrePagos
+                .FirstOrDefaultAsync(p => p.IdPrePago == idPrePago);
+            if (prePago == null)
+            {
+                respuesta.Mensaje = "No se encontró el pre-pago con el Id proporcionado.";
+                return NotFound(respuesta);
+            }
+            if (prePago.EsFinalizado)
+            {
+                respuesta.Mensaje = "El pre-pago ya ha sido utilizado.";
+                return BadRequest(respuesta);
+            }
+            // Verificar si el cliente y la dirección son válidos
+            var cliente = await _context.Clientes.FindAsync(prePago.IdCliente);
+            if (cliente == null)
+            {
+                respuesta.Mensaje = "El IdCliente asociado al pre-pago no es válido.";
+                return BadRequest(respuesta);
+            }
+            var direccion = await _context.Direccions.FindAsync(prePago.IdDireccion);
+            if (direccion == null)
+            {
+                respuesta.Mensaje = "El IdDireccion asociado al pre-pago no es válido.";
+                return BadRequest(respuesta);
+            }
+            // Obtener los PreConceptos relacionados con el IdPrePago
+            var preConceptos = await _context.PreConceptos
+                .Where(pc => pc.IdPrePago == idPrePago)
+                .ToListAsync();
+            if (!preConceptos.Any())
+            {
+                respuesta.Mensaje = "No se encontraron conceptos asociados al pre-pago.";
+                return NotFound(respuesta);
+            }
+            var strategy = _context.Database.CreateExecutionStrategy();
+            try
+            {
+                await strategy.ExecuteAsync(async () =>
+                {
+                    await using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        using (BlancosLoganContext context = new BlancosLoganContext())
+                        {
+                            var ven = new Ventum
+                            {
+                                IdCliente = prePago.IdCliente,
+                                IdDirecion = prePago.IdDireccion,
+                                Pago = "Prepago", // Puedes cambiar esto según sea necesario
+                                Fecha = DateTime.Now,
+                                Total = (long)preConceptos.Sum(concepto => concepto.Cantidad * ObtenerPrecioProducto(context, concepto.IdProducto))
+                            };
+                            context.Venta.Add(ven);
+                            await context.SaveChangesAsync();
+                            foreach (var concepto in preConceptos)
+                            await _context.SaveChangesAsync();
+                            prePago.EsFinalizado = true;
+                            await _context.SaveChangesAsync();
+                            await transaction.CommitAsync(); 
+                            var data = new
+                            {
+                                Venta = ven,
+                                Conceptos = preConceptos
+                            };
+                            respuesta.Data = data;
+                            respuesta.Exito = 1;
+                            respuesta.Mensaje = "Venta agregada con éxito";
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                respuesta.Mensaje = $"Error al intentar agregar la venta. {ex.Message}";
+                return StatusCode(500, respuesta);
+            }
+
+            return Ok(respuesta);
+        }
     }
 }

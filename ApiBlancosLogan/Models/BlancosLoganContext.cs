@@ -15,11 +15,17 @@ public partial class BlancosLoganContext : DbContext
     {
     }
 
+    public virtual DbSet<Carrusel> Carrusels { get; set; }
+
     public virtual DbSet<Cliente> Clientes { get; set; }
 
     public virtual DbSet<Concepto> Conceptos { get; set; }
 
     public virtual DbSet<Direccion> Direccions { get; set; }
+
+    public virtual DbSet<PreConcepto> PreConceptos { get; set; }
+
+    public virtual DbSet<PrePago> PrePagos { get; set; }
 
     public virtual DbSet<Producto> Productos { get; set; }
 
@@ -30,11 +36,26 @@ public partial class BlancosLoganContext : DbContext
     public virtual DbSet<Ventum> Venta { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("Server=GWNC31514;Database=BlancosLogan;Trusted_Connection=True;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Carrusel>(entity =>
+        {
+            entity.HasKey(e => e.IdCarrusel);
+
+            entity.ToTable("Carrusel");
+
+            entity.Property(e => e.IdCarrusel).HasColumnName("idCarrusel");
+            entity.Property(e => e.Imagen)
+                .HasColumnType("text")
+                .HasColumnName("imagen");
+            entity.Property(e => e.Nombre)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("nombre");
+        });
+
         modelBuilder.Entity<Cliente>(entity =>
         {
             entity.HasKey(e => e.IdCliente);
@@ -93,6 +114,20 @@ public partial class BlancosLoganContext : DbContext
             entity.Property(e => e.Telefono)
                 .HasMaxLength(10)
                 .IsUnicode(false);
+        });
+
+        modelBuilder.Entity<PreConcepto>(entity =>
+        {
+            entity.HasKey(e => e.IdPreConcepto).HasName("PK__PreConce__0E2F4E471B5663C0");
+
+            entity.Property(e => e.Cantidad).HasColumnType("decimal(18, 2)");
+        });
+
+        modelBuilder.Entity<PrePago>(entity =>
+        {
+            entity.HasKey(e => e.IdPrePago).HasName("PK__PrePagos__465EC904E18D95ED");
+
+            entity.Property(e => e.IdPrePago).ValueGeneratedNever();
         });
 
         modelBuilder.Entity<Producto>(entity =>

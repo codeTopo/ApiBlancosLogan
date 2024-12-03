@@ -11,10 +11,48 @@ namespace ApiBlancosLogan.Controllers
     public class ProductosController(BlancosLoganContext context) : ControllerBase
     {
         //solicitudes http
-
+        [HttpGet("{cliente}")]
+        [Authorize(Roles = "Master,Admin,Usuario")]
+        public async Task<IActionResult> Get(string cliente)
+        {
+            Respuestas respuestas = new()
+            {
+                Exito = 0,
+                Mensaje = "Error en la conexión a la base de datos"
+            };
+            try
+            {
+                var totalProductos = await context.Productos.ToListAsync();
+                int totalCount = totalProductos.Count;
+                int midpoint = totalCount / 2;
+                List<Producto> productosSeleccionados;
+                // Si el cliente es "frontend", devolver la primera mitad
+                if (cliente.ToLower() == "web")
+                {
+                    productosSeleccionados = totalProductos.Take(midpoint).ToList();
+                }
+                // Si el cliente es "bot", devolver la segunda mitad
+                else if (cliente.ToLower() == "bot")
+                {
+                    productosSeleccionados = totalProductos.Skip(midpoint).ToList();
+                }
+                else
+                {
+                    return BadRequest(new { mensaje = "Cliente no válido. Debe ser 'web' o 'bot'." });
+                }
+                respuestas.Exito = 1;
+                respuestas.Mensaje = "Lista de productos obtenida con éxito.";
+                respuestas.Data = productosSeleccionados;
+            }
+            catch (Exception ex)
+            {
+                respuestas.Mensaje = ex.Message;
+            }
+            return Ok(respuestas);
+        }
         [HttpGet]
-        [Authorize(Roles ="Master,Usuario")]
-        public async Task<IActionResult> Get()
+        [Authorize(Roles = "Master")]
+        public async Task<IActionResult> GetMaster()
         {
             Respuestas respuestas = new()
             {
@@ -23,26 +61,28 @@ namespace ApiBlancosLogan.Controllers
             };
             try
             {
-                var productos = await context.Productos.ToListAsync();
+                var cliente = await context.Productos.ToListAsync();
                 respuestas.Exito = 1;
-                respuestas.Mensaje = "lista De productos";
-                respuestas.Data = productos;
+                respuestas.Mensaje = "lista De Productos";
+                respuestas.Data = cliente;
             }
             catch (Exception ex)
             {
-                respuestas.Mensaje=ex.Message;
+                respuestas.Mensaje = ex.Message;
             }
             return Ok(respuestas);
         }
+
         [HttpPost("agregar")]
-        [Authorize(Roles ="Master")]
-        public async Task<IActionResult>Post(ProductoRequest model)
+        [Authorize(Roles = "Master")]
+        public async Task<IActionResult> Post(ProductoRequest model)
         {
-            Respuestas respuestas = new ()
+            Respuestas respuestas = new()
             {
                 Exito = 0,
                 Mensaje = "Error en la conexión a la base de datos"
             };
+
             if (!ModelState.IsValid)
             {
                 var errores = ModelState
@@ -59,27 +99,39 @@ namespace ApiBlancosLogan.Controllers
 
                 return BadRequest(respuestas);
             }
-            await using var transaction = await context.Database.BeginTransactionAsync();
+            // Crear la estrategia de ejecución
+            var strategy = context.Database.CreateExecutionStrategy();
             try
             {
-                Producto prod = new()
+                await strategy.ExecuteAsync(async () =>
                 {
-                    Nombre = model.Nombre!,
-                    Descripcion = model.Descripcion!,
-                    Precio = (decimal)model.Precio!,
-                    Ubicacion = model.Ubicacion!,
-                };
-                context.Productos.Add(prod);
-                await context.SaveChangesAsync();
-                await transaction.CommitAsync(); // Confirma la transacción si todo está bien
-                respuestas.Exito = 1;
-                respuestas.Mensaje = "Producto agregado correctamente.";
-                respuestas.Data = prod;
-
+                    // Iniciar la transacción
+                    await using var transaction = await context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        Producto prod = new()
+                        {
+                            Nombre = model.Nombre!,
+                            Descripcion = model.Descripcion!,
+                            Precio = (decimal)model.Precio!,
+                            Ubicacion = model.Ubicacion!,
+                        };
+                        context.Productos.Add(prod);
+                        await context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                        respuestas.Exito = 1;
+                        respuestas.Mensaje = "Producto agregado correctamente.";
+                        respuestas.Data = prod;
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
                 respuestas.Mensaje = $"Error al intentar agregar el producto. {ex.Message}";
             }
             return Ok(respuestas);
@@ -93,8 +145,6 @@ namespace ApiBlancosLogan.Controllers
                 Exito = 0,
                 Mensaje = "Problemas con la conexión a la base de datos"
             };
-
-            await using var transaction = await context.Database.BeginTransactionAsync();
             try
             {
                 var producto = await context.Productos.FindAsync(idProducto); // Asincrónico para encontrar el producto
@@ -110,7 +160,6 @@ namespace ApiBlancosLogan.Controllers
                 if (!string.IsNullOrEmpty(model.Ubicacion)) { producto.Ubicacion = model.Ubicacion; }
                 context.Entry(producto).State = EntityState.Modified;
                 await context.SaveChangesAsync();
-                await transaction.CommitAsync();
                 respuesta.Exito = 1;
                 respuesta.Mensaje = "Producto editado correctamente.";
                 respuesta.Data = producto;
@@ -118,7 +167,7 @@ namespace ApiBlancosLogan.Controllers
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                
                 respuesta.Mensaje = $"Error al intentar editar el producto. {ex.Message}";
                 return StatusCode(500, respuesta); // Retorna un estado de error más adecuado
             }
