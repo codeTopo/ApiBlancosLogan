@@ -23,6 +23,8 @@ public partial class BlancosLoganContext : DbContext
 
     public virtual DbSet<Direccion> Direccions { get; set; }
 
+    public virtual DbSet<Pago> Pagos { get; set; }
+
     public virtual DbSet<PreConcepto> PreConceptos { get; set; }
 
     public virtual DbSet<PrePago> PrePagos { get; set; }
@@ -36,6 +38,7 @@ public partial class BlancosLoganContext : DbContext
     public virtual DbSet<Ventum> Venta { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("Server=GWNC31514;Database=BlancosLogan;Trusted_Connection=True;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -113,6 +116,29 @@ public partial class BlancosLoganContext : DbContext
                 .IsUnicode(false);
             entity.Property(e => e.Telefono)
                 .HasMaxLength(10)
+                .IsUnicode(false);
+        });
+
+        modelBuilder.Entity<Pago>(entity =>
+        {
+            entity.HasKey(e => e.IdPagos).HasName("PK__Pagos__04137C5B91CACF00");
+
+            entity.Property(e => e.Accion)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Estado)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.FechaActualizacion).HasColumnType("datetime");
+            entity.Property(e => e.FechaCreacion).HasColumnType("datetime");
+            entity.Property(e => e.PaymentId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ReferenciaInterna)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.TipoEvento)
+                .HasMaxLength(50)
                 .IsUnicode(false);
         });
 

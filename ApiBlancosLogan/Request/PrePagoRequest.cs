@@ -29,23 +29,4 @@ namespace ApiBlancosLogan.Request
         [Required(ErrorMessage = "El campo Cantidad es obligatorio.")]
         public decimal? Cantidad { get; set; }
     }
-
-    public class MercadoPagoWebhookResponse
-    {
-        [JsonProperty("id")]
-        public string? Id { get; set; }
-
-        [JsonProperty("status")]
-        public string? Status { get; set; }
-
-        [JsonProperty("metadata")]
-        public Metadata? Metadata { get; set; }
-    }
-
-    public class Metadata
-    {
-        [JsonProperty("idPrepago")]
-        public string? IdPrepago { get; set; }
-    }
-
 }

@@ -134,6 +134,7 @@ public class PrePagoController : ControllerBase
                         IdPrePago = idPrePago,
                         IdCliente = (long)model.IdCliente!,
                         IdDireccion = (long)model.IdDireccion!,
+                        
                     };
                     _context.PrePagos.Add(prePago);
                     decimal subtotal = 0;
@@ -163,14 +164,7 @@ public class PrePagoController : ControllerBase
                     string urlPago;
                     try
                     {
-                        urlPago = await _mercadoPagoService.CrearPreferencia(
-                            model.Email!,
-                            cliente.Nombre,
-                            cliente.Telefono,
-                            cliente.Apellidos,
-                            direccion.CodigoPostal,
-                            idPrePago.ToString()
-                        );
+                        urlPago = await _mercadoPagoService.CrearPreferencia( idPrePago.ToString(), model.Email!);
                     }
                     catch (Exception ex)
                     {
@@ -187,7 +181,7 @@ public class PrePagoController : ControllerBase
                 catch (Exception ex)
                 {
                     await transaction.RollbackAsync();
-                    throw; // Lanzar la excepción para manejarla en el bloque exterior
+                    return Ok(Ok(ex));
                 }
             });
         }
@@ -263,7 +257,6 @@ public class PrePagoController : ControllerBase
         }
         return Ok(respuesta);
     }
-
     [HttpGet("validar/{idPrePago}")]
     [Authorize(Roles = "Master, Admin, Usuario")]
     public async Task<IActionResult> ObtenerDetallePrepago(Guid idPrePago)

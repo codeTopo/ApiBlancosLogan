@@ -1,20 +1,38 @@
 ﻿using MercadoPago.Config;
 using MercadoPago.Client.Preference;
 using MercadoPago.Client;
+using MercadoPago.Client.Payment;
+using ApiBlancosLogan.Request;
+
 
 namespace ApiBlancosLogan.Tools
 {
     public class MercadoPagoService
     {
-        private readonly IConfiguration _configuration;
-        public MercadoPagoService(IConfiguration configuration)
+        private readonly decimal _unitPrice;
+        public MercadoPagoService()
         {
-            _configuration = configuration;
-            MercadoPagoConfig.AccessToken = _configuration["MercadoPago:token"];
+            var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json")
+            .Build();
+            string token = configuration["MercadoPago:Token"]!;
+            if (!string.IsNullOrEmpty(token))
+            {
+                MercadoPagoConfig.AccessToken = token;
+            }
+            else
+            {
+                throw new Exception("El token de MercadoPago no está configurado.");
+            }
+            if (!decimal.TryParse(configuration["MercadoPago:UnitPrice"], out _unitPrice))
+            {
+                throw new Exception("El UnitPrice esta en en valor 0 favor de verificarlo");
+            }
         }
 
-        // Método para crear una preferencia de pago
-        public async Task<string> CrearPreferencia(string email, string nombre, string apellido, string telefono, string codigopostal, string idPrepago)
+        // Metodo para crear una preferencia de pago
+        public async Task<string> CrearPreferencia(string idPrepago, string email)
         {
             var requestOptions = new RequestOptions();
             requestOptions.CustomHeaders.Add("x-idempotency-key", Guid.NewGuid().ToString());
@@ -25,11 +43,11 @@ namespace ApiBlancosLogan.Tools
                 {
                     new PreferenceItemRequest
                     {
-                        Id = idPrepago,
-                        Title = "Blancos Logan Anticipo",
+                        Title = "Anticipo Blancos Logan",
+                        Description = $"Anticipo del pedido con ID: {idPrepago}",
                         CurrencyId = "MXN",
-                        UnitPrice = 1500,
-                        Quantity=1
+                        UnitPrice = _unitPrice,
+                        Quantity = 1
                     }
                 },
                 BackUrls = new PreferenceBackUrlsRequest
@@ -38,22 +56,6 @@ namespace ApiBlancosLogan.Tools
                     Failure = "https://tusitio.com/fallo",
                     Pending = "https://tusitio.com/pendiente"
                 },
-                Payer = new PreferencePayerRequest
-                {
-                    Name = nombre,
-                    Surname = apellido,  
-                    Email = email,
-                    Phone = new MercadoPago.Client.Common.PhoneRequest
-                    {
-                        AreaCode = "52", 
-                        Number = telefono
-                    },
-                    Address = new MercadoPago.Client.Common.AddressRequest
-                    {
-                        ZipCode = codigopostal
-                    }
-                },
-                // Configurar auto-retorno
                 AutoReturn = "approved",
                 PaymentMethods = new PreferencePaymentMethodsRequest
                 {
@@ -61,19 +63,19 @@ namespace ApiBlancosLogan.Tools
                     {
                        new PreferencePaymentMethodRequest { Id = "amex" },
                     },
+                    DefaultPaymentMethodId = "clabe",
                     ExcludedPaymentTypes = new List<PreferencePaymentTypeRequest>
                     {
-                        new PreferencePaymentTypeRequest { Id = "credit_card" },  // Excluye tarjetas de crédito
-                        new PreferencePaymentTypeRequest { Id = "digital_currency" },  // Excluye criptomonedas
+                       // new PreferencePaymentTypeRequest { Id = "credit_card" },
+                        new PreferencePaymentTypeRequest { Id = "digital_currency" }
                     },
                 },
-                StatementDescriptor = "BLANCOS LOGAN",  // Texto que aparecerá en el estado de cuenta del cliente
-                ExternalReference = idPrepago,  // Una referencia interna para tu sistema
-                Metadata = new Dictionary<string, object>
-                {
-                    { "idPrepago", idPrepago }
-                },
+                StatementDescriptor = "Anticipo Para Blancos Logan",
                 Expires = true,
+                Payer = new PreferencePayerRequest
+                {
+                    Email = email
+                }
             };
             // Crear la preferencia
             var preferenceClient = new PreferenceClient();
@@ -85,6 +87,26 @@ namespace ApiBlancosLogan.Tools
             }
             // Devolver la URL de inicio del pago
             return preference.InitPoint;
+        }
+
+        //Metodo para buscar un pago realizado 
+        public async Task<Respuestas> ObtenerDetallesPago(long paymentId)
+        {
+            var respuestas = new Respuestas { Exito = 0, Mensaje = "Error al Realizar la funcion" };
+            var paymentClient = new PaymentClient();
+            var payment = await paymentClient.GetAsync(paymentId);
+            if (payment == null)
+            {
+                respuestas.Exito =0;
+                respuestas.Mensaje = $"No se encontraron detalles para el pago con ID {paymentId}.";
+            }
+            else
+            {
+                respuestas.Exito = 1;
+                respuestas.Mensaje = "Solicitud Exitosa datos";
+                respuestas.Data = payment;
+            }
+            return respuestas;
         }
     }
 }
