@@ -12,6 +12,8 @@ builder.Services.AddControllers();
 //todo esto es el jwt
 builder.Configuration.AddJsonFile("appsettings.json");
 var secretkey = builder.Configuration.GetValue<string>("settings:secretkey");
+var allowedOrigins = builder.Configuration.GetSection("settings:AllowedOrigins").Get<string[]>();
+
 if (string.IsNullOrEmpty(secretkey))
 {
     // Manejar el caso cuando secretkey es null o una cadena vacía
@@ -53,9 +55,9 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost4200", builder =>
     {
-        builder.WithOrigins("http://localhost:4200", "http://localhost:3000")
-               .AllowAnyHeader()
-               .AllowAnyMethod();
+        builder.WithOrigins(allowedOrigins!)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 builder.Services.AddScoped<MercadoPagoService>();

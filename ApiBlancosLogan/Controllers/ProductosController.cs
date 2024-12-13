@@ -72,6 +72,26 @@ namespace ApiBlancosLogan.Controllers
             }
             return Ok(respuestas);
         }
+        [HttpGet("id/{idProducto}")]
+        [Authorize(Roles ="Master,Admin,Usuario")]
+        public async Task<IActionResult>GetId(long idProducto)
+        {
+            var respuestas = new Respuestas { Exito = 0, Mensaje = "Error en la conexión a la base de datos" };
+            var prod = await (from producto in context.Productos
+                              where producto.IdProducto == idProducto
+                              select new Producto
+                              {
+                                  Nombre= producto.Nombre,
+                                  Descripcion = producto.Descripcion,
+                                  Precio = producto.Precio,
+                                  Ubicacion = producto.Ubicacion
+
+                              }).ToListAsync();
+            respuestas.Exito = 1;
+            respuestas.Mensaje = "Datos del Articulo Solicitado";
+            respuestas.Data= prod;
+            return Ok(respuestas);
+        }
 
         [HttpPost("agregar")]
         [Authorize(Roles = "Master")]

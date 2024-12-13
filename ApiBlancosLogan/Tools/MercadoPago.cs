@@ -10,6 +10,9 @@ namespace ApiBlancosLogan.Tools
     public class MercadoPagoService
     {
         private readonly decimal _unitPrice;
+        private readonly string exito;
+        private readonly string fall;
+        private readonly string pendiente;
         public MercadoPagoService()
         {
             var configuration = new ConfigurationBuilder()
@@ -29,6 +32,13 @@ namespace ApiBlancosLogan.Tools
             {
                 throw new Exception("El UnitPrice esta en en valor 0 favor de verificarlo");
             }
+            string _exito = configuration["MercadoPago:UrlReturnExito"]!;
+            string _fall = configuration["MercadoPago:UrlReturnFaill"]!;
+            string _pendiente = configuration["MercadoPago:UrlReturnPending"]!;
+
+            exito = _exito;
+            fall = _fall;
+            pendiente = _pendiente;
         }
 
         // Metodo para crear una preferencia de pago
@@ -52,9 +62,9 @@ namespace ApiBlancosLogan.Tools
                 },
                 BackUrls = new PreferenceBackUrlsRequest
                 {
-                    Success = "https://tusitio.com/exito",
-                    Failure = "https://tusitio.com/fallo",
-                    Pending = "https://tusitio.com/pendiente"
+                    Success = exito,
+                    Failure = fall,
+                    Pending = pendiente
                 },
                 AutoReturn = "approved",
                 PaymentMethods = new PreferencePaymentMethodsRequest
